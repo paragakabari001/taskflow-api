@@ -1,4 +1,5 @@
 import { Task, User, TaskFilterOptions } from '../types/task';
+import { escapeRegex } from '../utils/cryptoSecurity';
 
 export class InMemoryDatabase {
   private static instance: InMemoryDatabase;
@@ -58,9 +59,9 @@ export class InMemoryDatabase {
         result = result.filter(t => t.assignedTo === filter.assignedTo);
       }
       if (filter.search) {
-        const query = filter.search.toLowerCase();
+        const sanitizedQuery = escapeRegex(filter.search.trim()).toLowerCase();
         result = result.filter(
-          t => t.title.toLowerCase().includes(query) || t.description.toLowerCase().includes(query)
+          t => t.title.toLowerCase().includes(sanitizedQuery) || t.description.toLowerCase().includes(sanitizedQuery)
         );
       }
     }

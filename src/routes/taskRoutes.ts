@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { TaskController } from '../controllers/taskController';
+import { validateCreateTask, validateUpdateTask } from '../middleware/validator';
 
 export const createTaskRouter = (controller?: TaskController): Router => {
   const router = Router();
@@ -7,8 +8,8 @@ export const createTaskRouter = (controller?: TaskController): Router => {
 
   router.get('/', taskController.getTasks);
   router.get('/:id', taskController.getTaskById);
-  router.post('/', taskController.createTask);
-  router.put('/:id', taskController.updateTask);
+  router.post('/', validateCreateTask, taskController.createTask);
+  router.put('/:id', validateUpdateTask, taskController.updateTask);
   router.delete('/:id', taskController.deleteTask);
 
   return router;
