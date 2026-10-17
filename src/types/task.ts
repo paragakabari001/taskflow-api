@@ -15,7 +15,7 @@ export interface Task {
   description: string;
   status: TaskStatus;
   priority: TaskPriority;
-  assignedTo?: string; // User ID
+  assignedTo?: string;
   dueDate?: string;
   tags: string[];
   createdAt: Date;
@@ -46,4 +46,20 @@ export interface TaskFilterOptions {
   priority?: TaskPriority;
   assignedTo?: string;
   search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  totalCount: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  pagination: PaginationMeta;
 }
