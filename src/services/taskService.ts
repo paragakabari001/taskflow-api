@@ -1,25 +1,67 @@
 import { InMemoryDatabase } from '../store/database';
-import { CreateTaskDTO, Task, TaskFilterOptions, UpdateTaskDTO } from '../types/task';
+import { CreateTaskDTO, PaginatedResult, Task, TaskFilterOptions, UpdateTaskDTO } from '../types/task';
+import { CacheService } from './cacheService';
+import { TaskEventEmitter } from '../events/taskEvents';
 import crypto from 'crypto';
 
 export class TaskService {
   private db: InMemoryDatabase;
+  private cache: CacheService;
+  private events: TaskEventEmitter;
 
-  constructor(db?: InMemoryDatabase) {
+  constructor(db?: InMemoryDatabase, cache?: CacheService, events?: TaskEventEmitter) {
     this.db = db || InMemoryDatabase.getInstance();
+    this.cache = cache || CacheService.getInstance();
+    this.events = events || TaskEventEmitter.getInstance();
   }
 
-  public listTasks(filter?: TaskFilterOptions): Task[] {
-    return this.db.getAllTasks(filter);
+  public listTasks(filter?: TaskFilterOptions): PaginatedResult<Task> {
+    const page = Math.max(1, Number(filter?.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(filter?.limit) || 10));
+
+    const cacheKey = `tasks:${JSON.stringify(filter || {})}:p${page}:l${limit}`;
+    const cached = this.cache.get<PaginatedResult<Task>>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const allTasks = this.db.getAllTasks(filter);
+    const totalCount = allTasks.length;
+    const totalPages = Math.ceil(totalCount / limit) || 1;
+    const startIndex = (page - 1) * limit;
+    const paginatedData = allTasks.slice(startIndex, startIndex + limit);
+
+    const result: PaginatedResult<Task> = {
+      data: paginatedData,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    };
+
+    this.cache.set(cacheKey, result, 30); // 30s TTL
+    return result;
   }
 
   public getTaskById(id: string): Task {
+    const cacheKey = `task:${id}`;
+    const cached = this.cache.get<Task>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const task = this.db.getTaskById(id);
     if (!task) {
       const error: any = new Error(`Task with id '${id}' not found`);
       error.statusCode = 404;
       throw error;
     }
+
+    this.cache.set(cacheKey, task, 60);
     return task;
   }
 
@@ -52,11 +94,12 @@ export class TaskService {
       updatedAt: new Date()
     };
 
-    return this.db.insertTask(newTask);
+    const created = this.db.insertTask(newTask);
+    this.events.emitTaskCreated(created);
+    return created;
   }
 
   public updateTask(id: string, dto: UpdateTaskDTO): Task {
-    // Verify existence first
     this.getTaskById(id);
 
     if (dto.assignedTo) {
@@ -75,11 +118,13 @@ export class TaskService {
       throw error;
     }
 
+    this.events.emitTaskUpdated(updated);
     return updated;
   }
 
   public deleteTask(id: string): void {
     this.getTaskById(id);
     this.db.deleteTask(id);
+    this.events.emitTaskDeleted(id);
   }
 }

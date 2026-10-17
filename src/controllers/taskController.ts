@@ -15,14 +15,16 @@ export class TaskController {
         status: req.query.status as TaskStatus,
         priority: req.query.priority as TaskPriority,
         assignedTo: req.query.assignedTo as string,
-        search: req.query.search as string
+        search: req.query.search as string,
+        page: req.query.page ? parseInt(req.query.page as string, 10) : 1,
+        limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 10
       };
 
-      const tasks = this.taskService.listTasks(filter);
+      const result = this.taskService.listTasks(filter);
       res.status(200).json({
         success: true,
-        count: tasks.length,
-        data: tasks
+        data: result.data,
+        pagination: result.pagination
       });
     } catch (err) {
       next(err);
